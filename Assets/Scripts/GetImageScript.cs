@@ -7,21 +7,35 @@ using UnityEngine.Networking;
 public class GetImageScript : MonoBehaviour
 {
     int urlLength;
-    int index;
-    jsonData jsondata;
-    //string uri = "http://localhost:4000/";
-    string uri = "https://virtual360tour-backend.herokuapp.com/";
+    int imageIndex;
+    public static jsonData jsondata;
+    List<string> options;
+    public static bool ischanged = false;
+    public static string roomName;
+
+    string uri = "http://localhost:4000/";
+    //string uri = "https://virtual360tour-backend.herokuapp.com/";
+
 
     void Start()
     {
+        options = new List<string>();
+        
         StartCoroutine(DownloadImage());
+        UIManager.dropdown.ClearOptions();
     }
     
     void Update()
     {
-
+        if (ischanged)
+        {
+            selectedRoomIndex(roomName);
+            Debug.Log(roomName);
+            ischanged = false;
+        }
     }
 
+    
     IEnumerator DownloadImage()
     {
         UIManager.isLoading = true;
@@ -35,11 +49,11 @@ public class GetImageScript : MonoBehaviour
             else
             {
                 jsondata = JsonUtility.FromJson<jsonData>(req.downloadHandler.text);
-                Debug.Log(jsondata);
-                //TextureURL = jsondata.urls[0];
+                Debug.Log(req.downloadHandler.text);
                 urlLength = jsondata.urls.Length;
-                index = 0;
-                //Debug.Log("length : " + urlLength);
+                imageIndex = 0;
+                Debug.Log("length : " + jsondata.urls.Length);
+                
             }
             StartCoroutine(loadTexture(jsondata.urls[0]));
         }
@@ -48,21 +62,42 @@ public class GetImageScript : MonoBehaviour
 
     IEnumerator loadTexture(string texURL)
     {
-        UIManager.imageName = texURL.Split('_')[2].Split('.')[0] + " Room";
+        UIManager.imageName = texURL.Split('_')[2].Split('.')[0] + ((jsondata.picker_value == "bareland") ? " Room" : "") ;
         UnityWebRequest request = UnityWebRequestTexture.GetTexture(texURL);
         yield return request.SendWebRequest();
         if (request.isNetworkError || request.isHttpError)
         {
+            
             Debug.Log(request.error);
             UIManager.isLoading = false;
         }
         else
         {
-
+            
             Debug.Log("successfully downloaded");
+            
             this.gameObject.GetComponent<Renderer>().material.mainTexture = ((DownloadHandlerTexture)request.downloadHandler).texture;
             UIManager.isLoading = false;
+            Debug.Log(jsondata.picker_value);
+            if (jsondata.picker_value == "bareland")
+            {
+                Debug.Log(jsondata.urls.Length);
+                loadOptions();
+            }
         }
+    }
+
+    public void loadOptions()
+    {
+        options.Clear();
+        for (int i = 0; i < jsondata.urls.Length; i++)
+        {
+            Debug.Log("room " + i + ": " + jsondata.urls[i]);
+            options.Add(jsondata.urls[i].Split('_')[2].Split('.')[0]);
+            
+            
+        }
+        UIManager.dropdown.AddOptions(options);
     }
 
     public void ChangeImage(int id)
@@ -70,22 +105,35 @@ public class GetImageScript : MonoBehaviour
         UIManager.isLoading = true;
         if(id == 0)
         {
-            Debug.Log("length : " + urlLength + "\nindex : " + index);
-            index++;
-            if (index >= urlLength)
+            Debug.Log("length : " + urlLength + "\nindex : " + imageIndex);
+            imageIndex++;
+            if (imageIndex >= urlLength)
             {
-                index = 0;
+                imageIndex = 0;
             }
         }
         else if(id == 1){
-            index--;
-            if(index < 0)
+            imageIndex--;
+            if(imageIndex < 0)
             {
-                index = urlLength - 1;
+                imageIndex = urlLength - 1;
             }
         }
         
-        StartCoroutine(loadTexture(jsondata.urls[index]));
+        StartCoroutine(loadTexture(jsondata.urls[imageIndex]));
+    }
+
+    public void selectedRoomIndex(string name)
+    {
+        for (int i = 0; i < jsondata.urls.Length; i++)
+        {
+            if (jsondata.urls[i].Split('_')[2].Split('.')[0] == name)
+            {
+                UIManager.isLoading = true;
+                StartCoroutine(loadTexture(jsondata.urls[i]));
+                Debug.Log("room index :" + i);
+            }
+        }
     }
 
     private void OnApplicationQuit()
@@ -123,4 +171,5 @@ public class jsonData
 {
     public string message;
     public string[] urls;
+    public string picker_value;
 }
